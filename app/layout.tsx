@@ -28,6 +28,9 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "DOMNI — Powering Campus Experiences",
+  icons: {
+    icon: "/favicon.ico",
+  },
   description:
     "Create events, sell tickets, manage nominations, and run unforgettable campus experiences with DOMNI.",
 };
