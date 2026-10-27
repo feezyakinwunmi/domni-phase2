@@ -79,7 +79,7 @@ export default function SignupPage() {
         <div className="h-px flex-1 bg-slate-100" />
       </div>
 
-      <OAuthButtons />
+      {/* <OAuthButtons /> */}
 
       <p className="mt-8 text-center text-sm text-slate-500">
         Already have an account?{" "}
