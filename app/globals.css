@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-ink-800 font-body antialiased;
+  }
+
+  ::selection {
+    @apply bg-violet-400/30 text-ink-900;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-violet-400 ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer utilities {
+  /* Die-cut ticket notches: two semicircular cutouts on the left/right edges. */
+  .ticket-notch {
+    -webkit-mask-image:
+      radial-gradient(circle 10px at 0 50%, transparent 10px, black 10.5px),
+      radial-gradient(circle 10px at 100% 50%, transparent 10px, black 10.5px);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      radial-gradient(circle 10px at 0 50%, transparent 10px, black 10.5px),
+      radial-gradient(circle 10px at 100% 50%, transparent 10px, black 10.5px);
+    mask-composite: intersect;
+  }
+
+  .perforation {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      currentColor 0,
+      currentColor 4px,
+      transparent 4px,
+      transparent 10px
+    );
+    width: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

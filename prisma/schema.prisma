@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// Extends Supabase auth.users (id matches auth.users.id).
+model Profile {
+  id                 String           @id @db.Uuid
+  email              String           @unique
+  fullName           String?
+  avatarUrl          String?
+  phone              String?
+  role               Role             @default(ATTENDEE)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  plan               String           @default("FREE")
+  maxTicketTemplates Int              @default(2)
+  events             Event[]          @relation("OrganizerEvents")
+  tickets            Ticket[]
+  transactions       Transaction[]
+  votingCampaigns    VotingCampaign[]
+
+  @@map("profiles")
+}
+
+model Event {
+  id                 String              @id @default(uuid()) @db.Uuid
+  organizerId        String              @db.Uuid
+  title              String
+  slug               String              @unique
+  description        String?
+  coverImage         String?
+  venue              String?
+  schoolName         String?
+  startsAt           DateTime
+  endsAt             DateTime?
+  status             EventStatus         @default(DRAFT)
+  featured           Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  ticketTemplateId   String?             @db.Uuid
+  event_comments     event_comments[]
+  sections           EventSection[]
+  organizer          Profile             @relation("OrganizerEvents", fields: [organizerId], references: [id])
+  ticketTemplate     TicketTemplate?     @relation(fields: [ticketTemplateId], references: [id], onUpdate: NoAction, map: "fk_ticket_template")
+  registrationFields RegistrationField[]
+  votingCampaigns    VotingCampaign[]
+
+  @@index([organizerId])
+  @@index([status])
+  @@map("events")
+}
+
+model RegistrationField {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId              String                 @db.Uuid
+  label                String
+  fieldType            String
+  placeholder          String?
+  required             Boolean?               @default(false)
+  options              Json?
+  sortOrder            Int?                   @default(0)
+  createdAt            DateTime?              @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime?              @default(now()) @db.Timestamp(6)
+  type                 String                 @default("text")
+  registration_answers registration_answers[]
+  event                Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("registration_fields")
+}
+
+/// A named sub-block of an event, e.g. "Awards Night", "Dinner", "After Party".
+model EventSection {
+  id          String       @id @default(uuid()) @db.Uuid
+  eventId     String       @db.Uuid
+  title       String
+  description String?
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketTypes TicketType[]
+
+  @@index([eventId])
+  @@map("event_sections")
+}
+
+/// Fully dynamic — organizers pick a preset title or type a custom one.
+/// There is intentionally no enum for `title`; the "creatable select" lives in the UI layer.
+model TicketType {
+  id                    String          @id @default(uuid()) @db.Uuid
+  sectionId             String          @db.Uuid
+  title                 String
+  description           String?
+  perks                 String[]        @default([])
+  priceKobo             Int
+  quantity              Int
+  quantitySold          Int             @default(0)
+  maxPerBuyer           Int?
+  salesStartAt          DateTime?
+  salesEndAt            DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  ticketTemplateId      String?         @db.Uuid
+  templateCustomization Json?
+  section               EventSection    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  ticketTemplate        TicketTemplate? @relation(fields: [ticketTemplateId], references: [id])
+  tickets               Ticket[]
+
+  @@index([sectionId])
+  @@map("ticket_types")
+}
+
+model Ticket {
+  id                   String                 @id(map: "Ticket_pkey") @default(uuid()) @db.Uuid
+  ticketTypeId         String                 @db.Uuid
+  ownerId              String?                @db.Uuid
+  guestEmail           String?
+  guestName            String?
+  qrCode               String                 @unique(map: "Ticket_qrCode_key")
+  qrImageUrl           String?
+  status               TicketStatus           @default(VALID)
+  checkedInAt          DateTime?
+  transactionId        String?                @db.Uuid
+  createdAt            DateTime               @default(now())
+  holderName           String?
+  holderPhone          String?
+  ticketTemplateId     String?                @db.Uuid
+  ticketNumber         String?                @unique
+  expiresAt            DateTime?              @db.Timestamp(6)
+  checkedInBy          String?                @db.Uuid
+  photoUrl             String?
+  registration_answers registration_answers[]
+  owner                Profile?               @relation(fields: [ownerId], references: [id], map: "Ticket_ownerId_fkey")
+  ticketType           TicketType             @relation(fields: [ticketTypeId], references: [id], map: "Ticket_ticketTypeId_fkey")
+  transaction          Transaction?           @relation(fields: [transactionId], references: [id], map: "Ticket_transactionId_fkey")
+  ticketTemplate       TicketTemplate?        @relation(fields: [ticketTemplateId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("tickets")
+}
+
+model VotingCampaign {
+  id               String    @id @default(uuid()) @db.Uuid
+  eventId          String?   @db.Uuid
+  organizerId      String    @db.Uuid
+  title            String
+  description      String?
+  pricePerVoteKobo Int
+  startsAt         DateTime
+  endsAt           DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  nominees         Nominee[]
+  event            Event?    @relation(fields: [eventId], references: [id])
+  organizer        Profile   @relation(fields: [organizerId], references: [id])
+
+  @@index([organizerId])
+  @@map("voting_campaigns")
+}
+
+model Nominee {
+  id         String         @id @default(uuid()) @db.Uuid
+  campaignId String         @db.Uuid
+  name       String
+  imageUrl   String?
+  bio        String?
+  voteCount  Int            @default(0)
+  createdAt  DateTime       @default(now())
+  campaign   VotingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  votes      Vote[]
+
+  @@index([campaignId])
+  @@map("nominees")
+}
+
+model Vote {
+  id            String       @id @default(uuid()) @db.Uuid
+  nomineeId     String       @db.Uuid
+  voterEmail    String?
+  quantity      Int          @default(1)
+  transactionId String?      @db.Uuid
+  createdAt     DateTime     @default(now())
+  nominee       Nominee      @relation(fields: [nomineeId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([nomineeId])
+  @@map("votes")
+}
+
+model Transaction {
+  id         String            @id @default(uuid()) @db.Uuid
+  userId     String?           @db.Uuid
+  type       TransactionType
+  status     TransactionStatus @default(PENDING)
+  amountKobo Int
+  reference  String            @unique
+  metadata   Json?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  tickets    Ticket[]
+  user       Profile?          @relation(fields: [userId], references: [id])
+  votes      Vote[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("transactions")
+}
+
+model event_comments {
+  id                   String           @id(map: "EventComment_pkey") @db.Uuid
+  eventId              String           @db.Uuid
+  parentId             String?          @db.Uuid
+  name                 String
+  message              String
+  isOrganizerReply     Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  events               Event            @relation(fields: [eventId], references: [id], onDelete: Cascade, map: "EventComment_eventId_fkey")
+  event_comments       event_comments?  @relation("event_commentsToevent_comments", fields: [parentId], references: [id], onDelete: Cascade, map: "EventComment_parentId_fkey")
+  other_event_comments event_comments[] @relation("event_commentsToevent_comments")
+
+  @@index([eventId], map: "EventComment_eventId_idx")
+  @@index([parentId], map: "EventComment_parentId_idx")
+}
+
+model TicketTemplate {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  createdAt   DateTime? @default(now()) @db.Timestamp(6)
+  templateKey String?   @unique
+  isPremium   Boolean?  @default(false)
+  orientation String?   @default("portrait")
+  config      Json?     @default("{}")
+  events      Event[]
+  tickets     Ticket[]
+  ticketTypes TicketType[]
+
+  @@map("ticket_templates")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model registration_answers {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId            String            @db.Uuid
+  fieldId             String            @db.Uuid
+  value               String?
+  createdAt           DateTime?         @default(now()) @db.Timestamp(6)
+  registration_fields RegistrationField @relation(fields: [fieldId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tickets             Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum Role {
+  ATTENDEE
+  ORGANIZER
+  ADMIN
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ENDED
+  CANCELLED
+}
+
+enum TicketStatus {
+  VALID
+  CHECKED_IN
+  REFUNDED
+  VOID
+}
+
+enum TransactionType {
+  TICKET_PURCHASE
+  VOTE_PURCHASE
+  PAYOUT
+  PLAN_UPGRADE
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REVERSED
+}
