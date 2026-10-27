@@ -138,7 +138,7 @@ export function TicketPhoto({
       alt=""
       crossOrigin="anonymous"
       style={{ width: size, height: size, boxShadow: `0 0 0 2px ${ring}` }}
-      className={`flex-shrink-0 object-cover ${square ? "rounded-lg" : "rounded-full"} ${className}`}
+      className={`flex-shrink-0 object-cover ${square ? "rounded-2xl" : "rounded-full"} ${className}`}
     />
   );
 }

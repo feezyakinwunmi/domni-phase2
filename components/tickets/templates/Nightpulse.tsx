@@ -44,7 +44,7 @@ export default function Nightpulse({ data, customization }: TicketTemplateProps)
           <h1 className="mt-3 text-2xl font-extrabold leading-tight tracking-tight">{data.eventName}</h1>
 
           <div className="mt-6 flex items-center gap-3">
-            <TicketPhoto data={data} ring="rgba(255,255,255,0.7)" size={50} />
+            <TicketPhoto data={data} ring="rgba(255,255,255,0.7)" size={72} square />
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-white/50">Attendee</p>
               <h2 className="mt-1 text-xl font-bold">{data.attendeeName}</h2>

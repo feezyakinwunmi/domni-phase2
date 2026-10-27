@@ -50,7 +50,7 @@ export default function SkylinePass({ data, customization }: TicketTemplateProps
       <div className="flex flex-1 flex-col justify-between p-6">
         <div>
           <div className="flex items-center gap-3">
-            <TicketPhoto data={data} ring={t.accent} size={46} />
+            <TicketPhoto data={data} ring={t.accent} size={72} square />
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Attendee</p>
               <h2 className="mt-1 text-xl font-bold text-slate-900">{data.attendeeName}</h2>

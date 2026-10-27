@@ -48,7 +48,7 @@ export default function PrismEdition({ data, customization }: TicketTemplateProp
           <h1 className="mt-2 text-xl font-bold leading-snug">{data.eventName}</h1>
 
           <div className="mt-8 flex items-center gap-4">
-            <TicketPhoto data={data} ring={t.accent} size={60} />
+            <TicketPhoto data={data} ring={t.accent} size={96} square />
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-white/40">Attendee</p>
               <h2 className="mt-1 text-2xl font-semibold">{data.attendeeName}</h2>

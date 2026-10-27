@@ -42,8 +42,13 @@ export default function BoardingPass({ data, customization }: TicketTemplateProp
         </div>
 
         <div className="flex-1 px-6 py-5">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400">Event</p>
-          <h1 className="mt-0.5 text-xl font-bold leading-tight text-slate-900">{data.eventName}</h1>
+          <div className="flex items-center gap-4">
+            <TicketPhoto data={data} ring={t.accent} size={80} square />
+            <div className="min-w-0">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400">Event</p>
+              <h1 className="mt-0.5 text-xl font-bold leading-tight text-slate-900">{data.eventName}</h1>
+            </div>
+          </div>
 
           <div className="mt-5 grid grid-cols-4 gap-4">
             <Cell label="Passenger" value={data.attendeeName} wide />
@@ -70,10 +75,7 @@ export default function BoardingPass({ data, customization }: TicketTemplateProp
           Admit
         </div>
         {data.qr ? <img src={data.qr} alt="Ticket QR code" className="h-28 w-28" /> : <div className="h-28 w-28" />}
-        <div className="flex items-center gap-2">
-          <TicketPhoto data={data} ring={t.accent} size={28} />
-          <p className="text-center text-[10px] font-bold uppercase leading-tight text-slate-700">{data.attendeeName}</p>
-        </div>
+        <p className="text-center text-[10px] font-bold uppercase leading-tight text-slate-700">{data.attendeeName}</p>
       </div>
 
       <TicketFinishLayer finish={t.finish} rounded="rounded-[20px]" />

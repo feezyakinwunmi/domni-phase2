@@ -43,7 +43,7 @@ export default function VelvetNoir({ data, customization }: TicketTemplateProps)
           <h1 className="mt-2 text-xl font-bold leading-snug tracking-wide">{data.eventName}</h1>
 
           <div className="mt-8 flex items-center gap-4">
-            <TicketPhoto data={data} ring={t.accent} size={60} />
+            <TicketPhoto data={data} ring={t.accent} size={96} square />
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-white/40">Guest</p>
               <h2 className="mt-1 text-2xl font-semibold">{data.attendeeName}</h2>

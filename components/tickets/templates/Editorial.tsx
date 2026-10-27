@@ -35,7 +35,7 @@ export default function Editorial({ data, customization }: TicketTemplateProps) 
         <div className="mt-6 h-[3px] w-14" style={{ backgroundColor: t.accent }} />
 
         <div className="mt-6 flex items-center gap-4">
-          <TicketPhoto data={data} ring="#1c1917" size={58} square className="grayscale-[30%]" />
+          <TicketPhoto data={data} ring="#1c1917" size={96} square className="grayscale-[30%]" />
           <div>
             <p className="text-[10px] uppercase tracking-[0.3em] text-stone-500">In honour of</p>
             <h2 className="mt-1 text-2xl italic">{data.attendeeName}</h2>

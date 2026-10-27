@@ -35,7 +35,7 @@ export default function AuroraMinimal({ data, customization }: TicketTemplatePro
         </div>
 
         <div className="mt-8 flex items-center gap-4">
-          <TicketPhoto data={data} ring={t.accent} size={60} />
+          <TicketPhoto data={data} ring={t.accent} size={96} square />
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Ticket Holder</p>
             <h2 className="mt-1 text-2xl font-semibold text-slate-900">{data.attendeeName}</h2>

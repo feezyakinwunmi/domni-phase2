@@ -44,7 +44,7 @@ export default function HoloFoil({ data, customization }: TicketTemplateProps) {
           <div className="my-6 h-10 rounded-lg opacity-90" style={{ backgroundImage: foil }} aria-hidden="true" />
 
           <div className="flex items-center gap-4">
-            <TicketPhoto data={data} ring={t.secondary} size={60} square />
+            <TicketPhoto data={data} ring={t.secondary} size={96} square />
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-white/50">Holder</p>
               <h2
