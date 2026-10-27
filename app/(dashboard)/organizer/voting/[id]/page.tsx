@@ -1,7 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { isUuid } from "@/lib/errors";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
+import { DeleteCampaignButton } from "@/components/voting/DeleteCampaignButton";
 import {
   ArrowLeft,
   Users,
@@ -16,6 +19,7 @@ interface VotingCampaignPageProps {
   }>;
   searchParams: Promise<{
     created?: string;
+    updated?: string;
   }>;
 }
 
@@ -24,7 +28,12 @@ export default async function VotingCampaignPage({
   searchParams,
 }: VotingCampaignPageProps) {
   const { id } = await params;
-  const { created } = await searchParams;
+  const { created, updated } = await searchParams;
+  if (!isUuid(id)) notFound();
+
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?redirectedFrom=/organizer/voting/${id}`);
+
   const campaign = await prisma.votingCampaign.findUnique({
     where: {
       id,
@@ -39,7 +48,7 @@ export default async function VotingCampaignPage({
     },
   });
 
-  if (!campaign) {
+  if (!campaign || campaign.organizerId !== user.id) {
     notFound();
   }
 
@@ -58,8 +67,8 @@ export default async function VotingCampaignPage({
   );
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto max-w-6xl">
+    <main>
+      <div>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/organizer/voting"
@@ -82,8 +91,16 @@ export default async function VotingCampaignPage({
                 Edit Campaign
               </Button>
             </Link>
+
+            <DeleteCampaignButton campaignId={campaign.id} />
           </div>
         </div>
+
+        {updated === "true" && (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            ✅ Changes saved.
+          </div>
+        )}
 
         {created === "true" && (
           <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">

@@ -3,63 +3,80 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { X } from "lucide-react";
-import TicketRenderer from "@/components/tickets/TicketRenderer";
-import type { TicketCustomization } from "@/components/tickets/types";
-import type { RegistrationFieldDraft } from "./RegistrationFormBuilder";
+import TicketRenderer, { LANDSCAPE_TEMPLATES } from "@/components/tickets/TicketRenderer";
+import type { TicketCustomization, TicketRenderData } from "@/components/tickets/types";
 
-interface Props {
-  eventTitle: string;
-  ticketTypeTitle: string;
+export type TicketSample = Omit<TicketRenderData, "attendeeName" | "qr" | "ticketNumber">;
+
+export function useSampleQr() {
+  const [qr, setQr] = useState("");
+  useEffect(() => {
+    QRCode.toDataURL("DOMNI-PREVIEW", { margin: 1, width: 256 }).then(setQr).catch(() => setQr(""));
+  }, []);
+  return qr;
+}
+
+/** Renders a ticket at natural size, scaled down to fit `maxWidth`. */
+export function ScaledTicket({
+  templateKey,
+  customization,
+  data,
+  maxWidth,
+}: {
   templateKey: string | null;
   customization: TicketCustomization | null;
-  registrationFields: RegistrationFieldDraft[];
+  data: TicketRenderData;
+  maxWidth: number;
+}) {
+  const natural = LANDSCAPE_TEMPLATES.has(templateKey ?? "") ? 560 : 340;
+  const scale = Math.min(1, maxWidth / natural);
+
+  return (
+    <div style={{ width: natural * scale }} className="mx-auto">
+      <div style={{ width: natural, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+        <TicketRenderer templateKey={templateKey} customization={customization} data={data} />
+      </div>
+    </div>
+  );
+}
+
+interface Props {
+  templateKey: string | null;
+  customization: TicketCustomization | null;
+  sample: TicketSample;
   onClose: () => void;
 }
 
-export function TicketPreviewModal({
-  eventTitle,
-  ticketTypeTitle,
-  templateKey,
-  customization,
-  registrationFields,
-  onClose,
-}: Props) {
-  const [qr, setQr] = useState("");
+export function TicketPreviewModal({ templateKey, customization, sample, onClose }: Props) {
+  const qr = useSampleQr();
 
   useEffect(() => {
-    QRCode.toDataURL("PREVIEW-SAMPLE").then(setQr);
-  }, []);
-
-  const extraFields = registrationFields
-    .filter((field) => field.label.trim())
-    .map((field) => ({
-      label: field.label,
-      value: field.placeholder || `Sample ${field.label}`,
-    }));
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[90vh] overflow-y-auto rounded-3xl p-2">
+    <div
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ticket preview"
+    >
+      <div className="max-h-[92vh] w-full max-w-[600px] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between px-2">
-          <h2 className="text-lg font-bold text-white">Ticket Preview</h2>
-
-          <button type="button" onClick={onClose} className="text-white">
+          <h2 className="text-lg font-bold text-white">Ticket preview</h2>
+          <button type="button" onClick={onClose} className="rounded-full p-1 text-white hover:bg-white/10" aria-label="Close preview">
             <X />
           </button>
         </div>
 
-        <TicketRenderer
+        <ScaledTicket
           templateKey={templateKey}
           customization={customization}
-          data={{
-            eventName: eventTitle || "Your Event",
-            attendeeName: "Jane Doe",
-            ticketType: ticketTypeTitle || "Ticket",
-            date: "Sat, Jan 1 · 6:00 PM",
-            venue: "Venue TBA",
-            qr,
-            extraFields,
-          }}
+          maxWidth={typeof window === "undefined" ? 560 : Math.min(560, window.innerWidth - 48)}
+          data={{ ...sample, attendeeName: "Jane Doe", qr, ticketNumber: "DMN-7KQ2X9PA" }}
         />
       </div>
     </div>

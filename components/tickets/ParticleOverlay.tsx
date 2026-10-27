@@ -22,6 +22,13 @@ const CONFETTI_SHAPES: {
   { x: 95, y: 55, size: 5, rotate: -18, shape: "ring" },
 ];
 
+// [x, y, radius] in a 100×100 viewBox — deterministic for SSR.
+const STAR_POINTS: [number, number, number][] = [
+  [8, 10, 2.2], [26, 4, 1.2], [44, 14, 1.6], [70, 6, 2.6], [90, 16, 1.4],
+  [14, 34, 1.3], [58, 28, 1.1], [84, 38, 2], [6, 62, 1.8], [36, 56, 1.2],
+  [64, 70, 2.4], [92, 66, 1.2], [20, 86, 1.5], [50, 92, 1.9], [80, 88, 1.3],
+];
+
 export function ParticleOverlay({
   variant = "none",
   color = "#ffffff",
@@ -96,6 +103,50 @@ export function ParticleOverlay({
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill={`url(#geo-${id})`} />
+      </svg>
+    );
+  }
+
+  if (variant === "waves") {
+    return (
+      <svg
+        className={`pointer-events-none absolute inset-0 h-full w-full ${className}`}
+        style={{ opacity }}
+        aria-hidden="true"
+      >
+        <defs>
+          <pattern id={`waves-${id}`} width="60" height="24" patternUnits="userSpaceOnUse">
+            <path
+              d="M0 12 Q 15 2 30 12 T 60 12"
+              fill="none"
+              stroke={color}
+              strokeOpacity="0.22"
+              strokeWidth="1"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#waves-${id})`} />
+      </svg>
+    );
+  }
+
+  if (variant === "stars") {
+    return (
+      <svg
+        className={`pointer-events-none absolute inset-0 h-full w-full ${className}`}
+        style={{ opacity }}
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        {STAR_POINTS.map(([x, y, r], i) => (
+          <path
+            key={i}
+            d={`M${x} ${y - r} L${x + r * 0.25} ${y - r * 0.25} L${x + r} ${y} L${x + r * 0.25} ${y + r * 0.25} L${x} ${y + r} L${x - r * 0.25} ${y + r * 0.25} L${x - r} ${y} L${x - r * 0.25} ${y - r * 0.25} Z`}
+            fill={color}
+            fillOpacity={0.5}
+          />
+        ))}
       </svg>
     );
   }

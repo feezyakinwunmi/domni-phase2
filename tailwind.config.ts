@@ -44,6 +44,7 @@ const config: Config = {
         display: ["var(--font-geist)", "sans-serif"],
         body: ["var(--font-inter)", "sans-serif"],
         mono: ["var(--font-mono)", "monospace"],
+        serif: ["var(--font-serif)", "Georgia", "serif"],
       },
       backgroundImage: {
         "domni-gradient": "linear-gradient(135deg, #4A3FBF 0%, #6D5AE6 45%, #8B7FFF 100%)",

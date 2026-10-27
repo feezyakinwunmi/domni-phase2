@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { PRO_PLAN_PRICE_KOBO } from "@/lib/constants/pricing";
+import { splitMatches } from "@/lib/paystack";
 
 export async function initiateProUpgrade() {
   const supabase = await createClient();
@@ -89,6 +90,12 @@ export async function verifyProUpgrade(reference: string) {
     return { success: false as const, error: "Payment amount mismatch." };
   }
 
+  // Pro fees must settle to DOMNI itself, never a subaccount.
+  if (!splitMatches(undefined, data.data)) {
+    await prisma.transaction.updateMany({ where: { id: transaction.id, status: "PENDING" }, data: { status: "FAILED" } });
+    return { success: false as const, error: "Payment routing mismatch. Please contact support." };
+  }
+
   const claim = await prisma.transaction.updateMany({
     where: { id: transaction.id, status: "PENDING" },
     data: { status: "SUCCESSFUL" },
@@ -97,7 +104,7 @@ export async function verifyProUpgrade(reference: string) {
   if (claim.count === 1 && transaction.userId) {
     await prisma.profile.update({
       where: { id: transaction.userId },
-      data: { plan: "PRO" },
+      data: { plan: "PRO", planActivatedAt: new Date() },
     });
   }
 

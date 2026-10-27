@@ -20,6 +20,18 @@
   }
 }
 
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  /* Keep ticket gradients/backgrounds when saving as PDF. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @layer utilities {
   /* Die-cut ticket notches: two semicircular cutouts on the left/right edges. */
   .ticket-notch {

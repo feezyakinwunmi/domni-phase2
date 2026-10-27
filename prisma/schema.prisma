@@ -20,6 +20,14 @@ model Profile {
   updatedAt          DateTime         @updatedAt
   plan               String           @default("FREE")
   maxTicketTemplates Int              @default(2)
+  /// Organizer payout account — sales settle here directly via a Paystack subaccount.
+  payoutBankCode         String?
+  payoutBankName         String?
+  payoutAccountNumber    String?
+  payoutAccountName      String?
+  paystackSubaccountCode String?
+  payoutUpdatedAt        DateTime?
+  planActivatedAt        DateTime?
   events             Event[]          @relation("OrganizerEvents")
   tickets            Ticket[]
   transactions       Transaction[]
@@ -37,6 +45,8 @@ model Event {
   coverImage         String?
   venue              String?
   schoolName         String?
+  /// Organizer-editable labels + extra info. See lib/event-details.ts
+  details            Json?
   startsAt           DateTime
   endsAt             DateTime?
   status             EventStatus         @default(DRAFT)

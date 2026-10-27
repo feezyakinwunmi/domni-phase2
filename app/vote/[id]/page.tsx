@@ -1,167 +1,128 @@
-
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { Clock3, Crown, Trophy, UserRound } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { isUuid } from "@/lib/errors";
+import { formatDateTime, formatNaira } from "@/lib/format";
 import { VoteModal } from "@/components/voting/VoteModal";
 import { Navbar } from "@/components/landing/Navbar";
+
 interface VotePageProps {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
+}
+
+function getCampaign(id: string) {
+  return prisma.votingCampaign.findUnique({
+    where: { id },
+    include: { nominees: { orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }] } },
+  });
+}
+
+export async function generateMetadata({ params }: VotePageProps): Promise<Metadata> {
+  const { id } = await params;
+  if (!isUuid(id)) return {};
+  const campaign = await getCampaign(id).catch(() => null);
+  return campaign ? { title: `${campaign.title} — Vote on DOMNI`, description: campaign.description?.slice(0, 160) } : {};
 }
 
 export default async function VotePage({ params }: VotePageProps) {
   const { id } = await params;
-  const campaign = await prisma.votingCampaign.findUnique({
-    where: {
-      id,
-    },
-    include: {
-      nominees: true,
-    },
-  });
-
-  if (!campaign) {
-    notFound();
-  }
-  const nominees = [...campaign.nominees].sort(
-    (a, b) => b.voteCount - a.voteCount
-  );
+  if (!isUuid(id)) notFound();
+  const campaign = await getCampaign(id);
+  if (!campaign) notFound();
 
   const now = new Date();
-
-  const votingOpen =
-    now >= new Date(campaign.startsAt) &&
-    now <= new Date(campaign.endsAt);
+  const open = now >= campaign.startsAt && now <= campaign.endsAt;
+  const upcoming = now < campaign.startsAt;
+  const total = campaign.nominees.reduce((n, x) => n + x.voteCount, 0);
+  const isFree = campaign.pricePerVoteKobo === 0;
 
   return (
-    <main className="min-h-screen bg-slate-50  py-10">
-                      <Navbar />
-        
-      <div className="mx-auto max-w-6xl mt-14 px-4">
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="p-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-wide text-violet-500">
-                  Voting Campaign
-                </p>
+    <main className="min-h-screen bg-slate-50">
+      <Navbar />
 
-                <h1 className="mt-2 text-4xl font-bold tracking-tight text-slate-900">
-                  {campaign.title}
-                </h1>
+      <section className="relative overflow-hidden bg-ink-800 px-4 pb-14 pt-32 text-white">
+        <div className="pointer-events-none absolute inset-0 bg-domni-radial" aria-hidden="true" />
+        <div className="relative mx-auto max-w-6xl">
+          <span
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+              open ? "bg-emerald-400/15 text-emerald-300" : upcoming ? "bg-amber-400/15 text-amber-300" : "bg-white/10 text-white/60"
+            }`}
+          >
+            {open && <span className="h-2 w-2 animate-pulse-dot rounded-full bg-emerald-400" />}
+            {open ? "Voting is live" : upcoming ? `Opens ${formatDateTime(campaign.startsAt)}` : "Voting has closed"}
+          </span>
+          <h1 className="mt-4 max-w-3xl font-display text-4xl font-bold tracking-tight md:text-5xl">{campaign.title}</h1>
+          {campaign.description && <p className="mt-4 max-w-2xl whitespace-pre-line text-white/70">{campaign.description}</p>}
 
-                <p className="mt-4 max-w-3xl text-slate-600">
-                  {campaign.description}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-violet-50 px-5 py-4 text-center">
-                  <p className="text-xs uppercase tracking-wide text-violet-500">
-                    Price Per Vote
-                  </p>
-
-                  <p className="mt-1 text-2xl font-bold text-violet-700">
-                    ₦{(campaign.pricePerVoteKobo / 100).toLocaleString()}
-                  </p>
-                </div>
-
-                <div
-                  className={`rounded-2xl px-5 py-3 text-center text-sm font-semibold ${
-                    votingOpen
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {votingOpen ? "Voting Open" : "Voting Closed"}
-                </div>
-              </div>
+          <dl className="mt-8 flex flex-wrap gap-x-10 gap-y-4 text-sm">
+            <div>
+              <dt className="text-white/50">Per vote</dt>
+              <dd className="mt-0.5 text-lg font-semibold">{isFree ? "Free · 1 per email" : formatNaira(campaign.pricePerVoteKobo)}</dd>
             </div>
+            <div>
+              <dt className="text-white/50">Total votes</dt>
+              <dd className="mt-0.5 text-lg font-semibold">{total.toLocaleString()}</dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-1 text-white/50">
+                <Clock3 className="h-3.5 w-3.5" /> {open || upcoming ? "Closes" : "Closed"}
+              </dt>
+              <dd className="mt-0.5 text-lg font-semibold">{formatDateTime(campaign.endsAt)}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
 
-            <div className="mt-10">
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold text-slate-900">
-                    Nominees
-                  </h2>
+      <div className="mx-auto max-w-6xl px-4 py-12">
+        <div className="mb-6 flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-amber-500" />
+          <h2 className="font-display text-2xl font-bold text-ink-800">Leaderboard</h2>
+        </div>
 
-                  <p className="mt-1 text-sm text-slate-500">
-                    Vote for your favorite nominee.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {nominees.map(
-                  (nominee, index) => (
-                    <div
-                      key={nominee.id}
-                      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition  hover:shadow-lg"
-                    >
-                      <div className="relative">
-                        {nominee.imageUrl ? (
-                          <img
-                            src={String(nominee.imageUrl)}
-                            alt={String(nominee.name ?? "")}
-                            className="h-72 w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-72 items-center justify-center bg-slate-100 text-slate-400">
-                            No Image
-                          </div>
-                        )}
-
-                        {index === 0 && nominee.voteCount > 0 && (
-                          <div className="absolute left-4 top-4 rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-white">
-                            👑 Leading
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-5">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <h3 className="text-xl font-bold text-slate-900">
-                              {nominee.name}
-                            </h3>
-
-                            {nominee.bio && (
-                              <p className="mt-2 text-sm text-slate-500">
-                                {nominee.bio}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="rounded-full bg-violet-100 px-3 py-1 text-sm font-semibold text-violet-700">
-                            #{index + 1}
-                          </div>
-                        </div>
-
-                        <div className="mt-5 flex items-center justify-between">
-                          <div>
-                            <p className="text-xs uppercase tracking-wide text-slate-400">
-                              Votes
-                            </p>
-
-                            <p className="mt-1 text-2xl font-bold text-slate-900">
-                              {nominee.voteCount.toLocaleString()}
-                            </p>
-                          </div>
-
-              <VoteModal
-  nomineeId={String(nominee.id)}
-  nomineeName={String(nominee.name)}
-  pricePerVoteKobo={campaign.pricePerVoteKobo}
-  disabled={!votingOpen}
-/>
-                        </div>
-                      </div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {campaign.nominees.map((nominee, index) => {
+            const share = total ? Math.round((nominee.voteCount / total) * 100) : 0;
+            const leading = index === 0 && nominee.voteCount > 0;
+            return (
+              <article key={nominee.id} className={`overflow-hidden rounded-3xl border bg-white transition hover:shadow-soft ${leading ? "border-amber-300" : "border-slate-200"}`}>
+                <div className="relative aspect-square bg-slate-100">
+                  {nominee.imageUrl ? (
+                    <img src={nominee.imageUrl} alt={nominee.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <UserRound className="h-16 w-16 text-slate-300" />
                     </div>
-                  )
-                )}
-              </div>
-            </div>
-          </div>
+                  )}
+                  <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-sm font-bold text-ink-800 shadow">#{index + 1}</span>
+                  {leading && (
+                    <span className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-amber-400 px-3 py-1 text-xs font-bold text-ink-900">
+                      <Crown className="h-3.5 w-3.5" /> Leading
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-5">
+                  <h3 className="text-lg font-bold text-ink-800">{nominee.name}</h3>
+                  {nominee.bio && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{nominee.bio}</p>}
+
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-semibold text-ink-800">{nominee.voteCount.toLocaleString()} votes</span>
+                      <span className="text-slate-400">{share}%</span>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-violet-100">
+                      <div className="h-full rounded-full bg-violet-500" style={{ width: `${share}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 [&>button]:w-full">
+                    <VoteModal nomineeId={nominee.id} nomineeName={nominee.name} pricePerVoteKobo={campaign.pricePerVoteKobo} disabled={!open} />
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </main>

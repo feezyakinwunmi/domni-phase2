@@ -49,11 +49,27 @@ cp .env.example .env
    role key into `.env`.
 2. Copy your Postgres connection strings (pooled + direct) into `DATABASE_URL`
    and `DIRECT_URL`.
-3. Push the schema and generate the client:
+3. **Stop `npm run dev` first** (on Windows it locks Prisma's engine file and
+   `prisma generate` fails with `EPERM`), then push the schema, generate the
+   client and seed the ticket designs:
    ```bash
    npx prisma db push
    npx prisma generate
+   node scripts/seed-templates.js
    ```
+   Every time `schema.prisma` changes, repeat this and restart the dev server —
+   a stale client is the usual cause of "column does not exist" errors.
+
+   **Admin panel:** add your email to `.env` and sign in, then open `/admin`:
+   ```
+   ADMIN_EMAILS=you@example.com
+   ```
+   (Comma-separate several. You can also promote people from the panel.)
+
+   **Payouts:** organizers connect a bank account in Settings → Payout account.
+   That creates a Paystack subaccount, and every ticket/vote payment is split
+   at checkout — the organizer's share settles to their bank, DOMNI's fee to
+   yours. Set the webhook URL in Paystack to `https://<your-domain>/api/paystack/webhook`.
 4. Run the RLS + storage policies in the Supabase SQL editor: paste in
    `prisma/rls-policies.sql` (this also creates the public `event-covers`
    storage bucket).

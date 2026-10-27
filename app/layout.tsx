@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Inter, JetBrains_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
+
+const serif = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-serif",
+  display: "swap",
+});
 
 const geist = Geist({
   subsets: ["latin"],
@@ -30,7 +36,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geist.variable} ${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={`${geist.variable} ${inter.variable} ${mono.variable} ${serif.variable}`}>
       <body>{children}</body>
     </html>
   );
