@@ -50,6 +50,13 @@ export async function createCampaign(payload: unknown): Promise<ActionResult<{ c
       if (event?.organizerId !== user.id) return { ok: false, error: "You can only link your own events." };
     }
 
+    // Double-submit guard (see createEvent).
+    const recent = await prisma.votingCampaign.findFirst({
+      where: { organizerId: user.id, title, startsAt: new Date(startsAt), createdAt: { gte: new Date(Date.now() - 2 * 60 * 1000) } },
+      select: { id: true },
+    });
+    if (recent) return { ok: true, campaignId: recent.id };
+
     const campaign = await prisma.votingCampaign.create({
       data: {
         organizerId: user.id,

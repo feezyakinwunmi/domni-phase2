@@ -42,7 +42,7 @@ async function loadTickets(params: { id?: string; order?: string }) {
   return ticket ? { tickets: [ticket], pending: false } : null;
 }
 
-async function toRenderData(ticket: TicketWithRelations) {
+async function toRenderData(ticket: TicketWithRelations, sponsorLogos: string[]) {
   const event = ticket.ticketType.section.event;
   const qr = await QRCode.toDataURL(ticket.qrCode, { margin: 1, width: 320, errorCorrectionLevel: "M" });
 
@@ -60,6 +60,7 @@ async function toRenderData(ticket: TicketWithRelations) {
       qr,
       ticketNumber: ticket.ticketNumber,
       photoUrl: ticket.photoUrl,
+      sponsorLogos,
       extraFields: [...ticket.registration_answers]
         .sort((a, b) => (a.registration_fields.sortOrder ?? 0) - (b.registration_fields.sortOrder ?? 0))
         // The photo is shown as the holder picture, not as a text row.
@@ -93,8 +94,15 @@ export default async function TicketSuccessPage({
     );
   }
 
-  const tickets = await Promise.all(result.tickets.map(toRenderData));
   const event = result.tickets[0].ticketType.section.event;
+  const sponsors = await prisma.partnerApplication.findMany({
+    where: { eventId: event.id, status: "PAID", logoUrl: { not: null }, package: { logoOnTicket: true } },
+    orderBy: { createdAt: "asc" },
+    select: { logoUrl: true },
+    take: 6,
+  });
+  const sponsorLogos = sponsors.map((s) => s.logoUrl!).filter(Boolean);
+  const tickets = await Promise.all(result.tickets.map((t) => toRenderData(t, sponsorLogos)));
 
   return (
     <main className="min-h-screen bg-slate-100 px-2 py-10 print:bg-white print:p-0">

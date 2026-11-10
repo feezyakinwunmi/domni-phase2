@@ -17,6 +17,7 @@ export const eventDetailsSchema = z.object({
   venueLabel: z.string().trim().max(40).default("Venue"),
   nameLabel: z.string().trim().max(40).default("Full Name"),
   emailLabel: z.string().trim().max(40).default("Email"),
+  partnerTabLabel: z.string().trim().max(40).default("Partner with us"),
   extras: z.array(eventExtraSchema).max(20).default([]),
 });
 
@@ -28,6 +29,7 @@ export const DEFAULT_EVENT_DETAILS: EventDetails = {
   venueLabel: "Venue",
   nameLabel: "Full Name",
   emailLabel: "Email",
+  partnerTabLabel: "Partner with us",
   extras: [],
 };
 
@@ -42,6 +44,7 @@ export function parseEventDetails(raw: unknown): EventDetails {
     venueLabel: d.venueLabel || DEFAULT_EVENT_DETAILS.venueLabel,
     nameLabel: d.nameLabel || DEFAULT_EVENT_DETAILS.nameLabel,
     emailLabel: d.emailLabel || DEFAULT_EVENT_DETAILS.emailLabel,
+    partnerTabLabel: d.partnerTabLabel || DEFAULT_EVENT_DETAILS.partnerTabLabel,
   };
 }
 

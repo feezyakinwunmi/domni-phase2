@@ -213,6 +213,20 @@ export async function initializeTicketPurchase(input: PurchaseInput): Promise<Pu
     // FREE — issue immediately. A zero-amount transaction groups the order so
     // the success page can show every ticket, not just the first.
     if (ticketType.priceKobo === 0) {
+      // Double-submit guard: the same person registering for the same ticket
+      // seconds ago gets that order back instead of a second set of tickets.
+      const recentOrder = await prisma.transaction.findFirst({
+        where: {
+          type: "TICKET_PURCHASE",
+          status: "SUCCESSFUL",
+          amountKobo: 0,
+          createdAt: { gte: new Date(Date.now() - 60 * 1000) },
+          AND: [{ metadata: { path: ["ticketTypeId"], equals: ticketType.id } }, { metadata: { path: ["email"], equals: email } }],
+        },
+        select: { reference: true },
+      });
+      if (recentOrder) return { status: "issued", redirect: `/tickets/success?order=${encodeURIComponent(recentOrder.reference)}` };
+
       const reference = `FREE-${randomUUID()}`;
       const transaction = await prisma.transaction.create({
         data: {

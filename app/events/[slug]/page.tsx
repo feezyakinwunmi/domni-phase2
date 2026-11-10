@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { TicketModal } from "@/components/events/TicketModal";
 import { Navbar } from "@/components/landing/Navbar";
 import { EventCommentsSheet } from "@/components/events/EventCommentsSheet";
+import { EventTabs } from "@/components/events/EventTabs";
+import { PartnerPackagesSection } from "@/components/partners/PartnerPackagesSection";
 import { formatDate, formatNaira, formatTime } from "@/lib/format";
 import { normalizeOptions, parseEventDetails } from "@/lib/event-details";
 
@@ -19,6 +21,12 @@ function getEvent(slug: string) {
     include: {
       registrationFields: { orderBy: { sortOrder: "asc" } },
       _count: { select: { event_comments: true } },
+      partnerPackages: { orderBy: { sortOrder: "asc" } },
+      partnerApplications: {
+        where: { status: "PAID", logoUrl: { not: null }, package: { showOnEventPage: true } },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, companyName: true, logoUrl: true, website: true, package: { select: { category: true, sortOrder: true } } },
+      },
       sections: {
         orderBy: { sortOrder: "asc" },
         include: { ticketTypes: { orderBy: { createdAt: "asc" } } },
@@ -44,6 +52,27 @@ export default async function EventDetailsPage({ params }: EventDetailsPageProps
   if (!event) notFound();
 
   const details = parseEventDetails(event.details);
+  const partnerPackages = event.partnerPackages.map((p) => ({
+    id: p.id,
+    category: p.category,
+    title: p.title,
+    description: p.description,
+    benefits: p.benefits,
+    pricingModel: p.pricingModel,
+    priceKobo: p.priceKobo,
+    unitLabel: p.unitLabel,
+    minUnits: p.minUnits,
+    maxUnits: p.maxUnits,
+    quantity: p.quantity,
+    quantityTaken: p.quantityTaken,
+    requiresApproval: p.requiresApproval,
+    highlight: p.highlight,
+    logoOnTicket: p.logoOnTicket,
+  }));
+  // Sponsors first (by package order), then exhibitors and the rest.
+  const partnerWall = [...event.partnerApplications].sort(
+    (a, b) => Number(a.package.category !== "SPONSORSHIP") - Number(b.package.category !== "SPONSORSHIP") || a.package.sortOrder - b.package.sortOrder
+  );
   const now = new Date();
   const effectiveEnd = event.endsAt ?? new Date(event.startsAt.getTime() + 24 * 60 * 60 * 1000);
   const hasEnded = effectiveEnd < now;
@@ -73,6 +102,79 @@ export default async function EventDetailsPage({ params }: EventDetailsPageProps
       ? [{ icon: <Building2 className="h-5 w-5 text-violet-500" />, label: details.hostLabel, value: event.schoolName }]
       : []),
   ];
+
+  const ticketsContent = (
+    <div className="space-y-8">
+      {event.sections.map((section) => (
+        <div key={section.id} className="rounded-3xl border border-slate-200 bg-white p-6">
+          <div className="mb-5">
+            <h3 className="text-2xl font-bold text-slate-900">{section.title}</h3>
+            {section.description && <p className="mt-2 text-slate-500">{section.description}</p>}
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {section.ticketTypes.map((ticket) => {
+              const remaining = Math.max(0, ticket.quantity - ticket.quantitySold);
+              const notYet = ticket.salesStartAt && ticket.salesStartAt > now;
+              const closed = ticket.salesEndAt && ticket.salesEndAt < now;
+              const disabledReason = hasEnded
+                ? "Event ended"
+                : remaining === 0
+                ? "Sold out"
+                : notYet
+                ? `On sale ${formatDate(ticket.salesStartAt!)}`
+                : closed
+                ? "Sales closed"
+                : undefined;
+
+              return (
+                <div key={ticket.id} className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h4 className="text-xl font-bold text-slate-900">{ticket.title}</h4>
+                      {ticket.description && <p className="mt-1 text-sm text-slate-500">{ticket.description}</p>}
+                    </div>
+                    <div className="whitespace-nowrap rounded-full bg-violet-100 px-4 py-1.5 text-sm font-bold text-violet-700">
+                      {formatNaira(ticket.priceKobo)}
+                    </div>
+                  </div>
+
+                  {ticket.perks.length > 0 && (
+                    <ul className="mt-4 flex flex-wrap gap-2">
+                      {ticket.perks.map((perk) => (
+                        <li key={perk} className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+                          {perk}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <p className={`mt-4 text-xs font-medium ${remaining === 0 ? "text-red-600" : remaining <= 10 ? "text-amber-600" : "text-slate-400"}`}>
+                    {remaining === 0 ? "Sold out" : remaining <= 10 ? `Only ${remaining} left` : `${remaining} available`}
+                  </p>
+
+                  <div className="mt-auto">
+                    <TicketModal
+                      ticketTypeId={ticket.id}
+                      ticketTitle={ticket.title}
+                      priceKobo={ticket.priceKobo}
+                      remaining={remaining}
+                      maxPerBuyer={ticket.maxPerBuyer}
+                      disabled={!!disabledReason}
+                      disabledReason={disabledReason}
+                      registrationFields={registrationFields}
+                      nameLabel={details.nameLabel}
+                      emailLabel={details.emailLabel}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
@@ -145,79 +247,53 @@ export default async function EventDetailsPage({ params }: EventDetailsPageProps
               </dl>
             )}
 
+            {partnerWall.length > 0 && (
+              <section className="mt-10">
+                <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-400">Sponsors & exhibitors</h2>
+                <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {partnerWall.map((p) => {
+                    const logo = <img src={p.logoUrl!} alt={p.companyName} className="max-h-12 max-w-full object-contain" />;
+                    return (
+                      <li key={p.id} title={p.companyName}>
+                        {p.website ? (
+                          <a href={p.website} target="_blank" rel="noopener noreferrer nofollow" className="flex h-20 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-violet-200 hover:shadow-soft">
+                            {logo}
+                          </a>
+                        ) : (
+                          <div className="flex h-20 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4">{logo}</div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
             <div className="mt-10">
               <EventCommentsSheet variant="section" eventId={event.id} eventTitle={event.title} count={event._count.event_comments} />
             </div>
 
-            <div id="tickets" className="mt-14 scroll-mt-6 space-y-8">
-              {event.sections.map((section) => (
-                <div key={section.id} className="rounded-3xl border border-slate-200 bg-white p-6">
-                  <div className="mb-5">
-                    <h3 className="text-2xl font-bold text-slate-900">{section.title}</h3>
-                    {section.description && <p className="mt-2 text-slate-500">{section.description}</p>}
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-2">
-                    {section.ticketTypes.map((ticket) => {
-                      const remaining = Math.max(0, ticket.quantity - ticket.quantitySold);
-                      const notYet = ticket.salesStartAt && ticket.salesStartAt > now;
-                      const closed = ticket.salesEndAt && ticket.salesEndAt < now;
-                      const disabledReason = hasEnded
-                        ? "Event ended"
-                        : remaining === 0
-                        ? "Sold out"
-                        : notYet
-                        ? `On sale ${formatDate(ticket.salesStartAt!)}`
-                        : closed
-                        ? "Sales closed"
-                        : undefined;
-
-                      return (
-                        <div key={ticket.id} className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <h4 className="text-xl font-bold text-slate-900">{ticket.title}</h4>
-                              {ticket.description && <p className="mt-1 text-sm text-slate-500">{ticket.description}</p>}
-                            </div>
-                            <div className="whitespace-nowrap rounded-full bg-violet-100 px-4 py-1.5 text-sm font-bold text-violet-700">
-                              {formatNaira(ticket.priceKobo)}
-                            </div>
-                          </div>
-
-                          {ticket.perks.length > 0 && (
-                            <ul className="mt-4 flex flex-wrap gap-2">
-                              {ticket.perks.map((perk) => (
-                                <li key={perk} className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
-                                  {perk}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-
-                          <p className={`mt-4 text-xs font-medium ${remaining === 0 ? "text-red-600" : remaining <= 10 ? "text-amber-600" : "text-slate-400"}`}>
-                            {remaining === 0 ? "Sold out" : remaining <= 10 ? `Only ${remaining} left` : `${remaining} available`}
-                          </p>
-
-                          <div className="mt-auto">
-                            <TicketModal
-                              ticketTypeId={ticket.id}
-                              ticketTitle={ticket.title}
-                              priceKobo={ticket.priceKobo}
-                              remaining={remaining}
-                              maxPerBuyer={ticket.maxPerBuyer}
-                              disabled={!!disabledReason}
-                              disabledReason={disabledReason}
-                              registrationFields={registrationFields}
-                              nameLabel={details.nameLabel}
-                              emailLabel={details.emailLabel}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+            <div id="tickets" className="mt-14 scroll-mt-24">
+              {partnerPackages.length > 0 ? (
+                <EventTabs
+                  partnerLabel={details.partnerTabLabel}
+                  tickets={ticketsContent}
+                  partners={
+                    <div className="space-y-12">
+                      <div className="rounded-3xl bg-ink-800 p-6 text-white md:p-8">
+                        <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">{details.partnerTabLabel}</p>
+                        <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">Put your brand in front of our audience</h2>
+                        <p className="mt-2 max-w-2xl text-sm text-white/70">
+                          Sponsorship, exhibition space, advertising and vendor opportunities at {event.title}. Pick a package below to book or apply.
+                        </p>
+                      </div>
+                      <PartnerPackagesSection packages={partnerPackages} />
+                    </div>
+                  }
+                />
+              ) : (
+                ticketsContent
+              )}
             </div>
           </div>
 
@@ -249,6 +325,14 @@ export default async function EventDetailsPage({ params }: EventDetailsPageProps
                 <Ticket className="h-4 w-4" />
                 {hasEnded ? "Event ended" : "Get tickets"}
               </a>
+              {partnerPackages.length > 0 && !hasEnded && (
+                <a
+                  href="#partner"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-5 py-3.5 text-sm font-semibold text-ink-800 hover:border-violet-300"
+                >
+                  {details.partnerTabLabel}
+                </a>
+              )}
             </div>
           </aside>
         </div>

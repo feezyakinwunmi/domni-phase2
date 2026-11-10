@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { SectionEditor, emptyTicketType, type SectionDraft } from "./SectionEditor";
 import { RegistrationFormBuilder, type RegistrationFieldDraft } from "./RegistrationFormBuilder";
 import { EventDetailsEditor } from "./EventDetailsEditor";
+import { PartnerPackagesEditor, type PartnerPackageDraft } from "./PartnerPackagesEditor";
+import type { PartnerCategory, PricingModel } from "@/lib/partners";
 import type { TicketTemplate } from "@/components/events/TicketTemplatePicker";
 
 import { createEvent, updateEvent } from "@/lib/actions/events";
@@ -19,6 +21,7 @@ import { normalizeOptions, parseEventDetails, FIELD_TYPES, type EventDetails, ty
 import { toDateTimeLocal } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import { uploadEventCover } from "@/lib/supabase/storage";
+import { useSubmitLock } from "@/lib/use-submit-lock";
 
 // Shape of the event the edit page passes in (Prisma row + relations).
 export interface EventFormInitialData {
@@ -47,6 +50,24 @@ export interface EventFormInitialData {
       ticketTemplateId: string | null;
       templateCustomization: unknown;
     }[];
+  }[];
+  partnerPackages?: {
+    id: string;
+    category: string;
+    title: string;
+    description: string | null;
+    benefits: string[];
+    pricingModel: string;
+    priceKobo: number;
+    unitLabel: string | null;
+    minUnits: number;
+    maxUnits: number | null;
+    quantity: number | null;
+    quantityTaken: number;
+    requiresApproval: boolean;
+    highlight: boolean;
+    logoOnTicket: boolean;
+    showOnEventPage: boolean;
   }[];
   registrationFields: {
     id: string;
@@ -99,6 +120,27 @@ function registrationFieldsFromInitialData(initialData?: EventFormInitialData): 
   }));
 }
 
+function packagesFromInitialData(initialData?: EventFormInitialData): PartnerPackageDraft[] {
+  return (initialData?.partnerPackages ?? []).map((p) => ({
+    id: p.id,
+    category: p.category as PartnerCategory,
+    title: p.title,
+    description: p.description ?? "",
+    benefits: p.benefits,
+    pricingModel: p.pricingModel as PricingModel,
+    price: p.priceKobo ? String(p.priceKobo / 100) : "",
+    unitLabel: p.unitLabel ?? "",
+    minUnits: String(p.minUnits),
+    maxUnits: p.maxUnits ? String(p.maxUnits) : "",
+    quantity: p.quantity ? String(p.quantity) : "",
+    requiresApproval: p.requiresApproval,
+    highlight: p.highlight,
+    logoOnTicket: p.logoOnTicket,
+    showOnEventPage: p.showOnEventPage,
+    quantityTaken: p.quantityTaken,
+  }));
+}
+
 function emptySection(): SectionDraft {
   return { id: crypto.randomUUID(), title: "", description: "", ticketTypes: [emptyTicketType()] };
 }
@@ -125,6 +167,8 @@ export function EventForm({ initialData, plan = "FREE", templates }: EventFormPr
   const [registrationFields, setRegistrationFields] = useState<RegistrationFieldDraft[]>(() =>
     registrationFieldsFromInitialData(initialData)
   );
+
+  const [partnerPackages, setPartnerPackages] = useState<PartnerPackageDraft[]>(() => packagesFromInitialData(initialData));
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -194,6 +238,23 @@ export function EventForm({ initialData, plan = "FREE", templates }: EventFormPr
         ...details,
         extras: details.extras.filter((x) => x.label.trim() || x.value.trim()),
       },
+      partnerPackages: partnerPackages.map((p) => ({
+        id: p.id,
+        category: p.category,
+        title: p.title,
+        description: p.description,
+        benefits: p.benefits.map((b) => b.trim()).filter(Boolean),
+        pricingModel: p.pricingModel,
+        price: p.price.trim() === "" ? 0 : Number(p.price),
+        unitLabel: p.unitLabel,
+        minUnits: p.minUnits.trim() === "" ? 1 : Number(p.minUnits),
+        maxUnits: p.maxUnits.trim() === "" ? undefined : Number(p.maxUnits),
+        quantity: p.quantity.trim() === "" ? undefined : Number(p.quantity),
+        requiresApproval: p.requiresApproval,
+        highlight: p.highlight,
+        logoOnTicket: p.logoOnTicket,
+        showOnEventPage: p.showOnEventPage,
+      })),
       registrationFields: registrationFields.map(({ id, label, type, placeholder, required, options }) => ({
         id,
         label,
@@ -221,8 +282,13 @@ export function EventForm({ initialData, plan = "FREE", templates }: EventFormPr
     };
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  const lock = useSubmitLock();
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    void lock(submitImpl);
+  }
+
+  async function submitImpl() {
     setError(null);
 
     // Validate before uploading the cover so a typo doesn't cost an upload.
@@ -405,6 +471,13 @@ export function EventForm({ initialData, plan = "FREE", templates }: EventFormPr
         nameLabel={details.nameLabel}
         emailLabel={details.emailLabel}
         onLabelsChange={(patch) => setDetails((d) => ({ ...d, ...patch }))}
+      />
+
+      <PartnerPackagesEditor
+        packages={partnerPackages}
+        onChange={setPartnerPackages}
+        tabLabel={details.partnerTabLabel}
+        onTabLabelChange={(partnerTabLabel) => setDetails((d) => ({ ...d, partnerTabLabel }))}
       />
 
       {error && (

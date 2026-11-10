@@ -131,6 +131,12 @@ export async function createEventComment(input: {
       parentId = parent.parentId ?? input.parentId;
     }
 
+    // Double-submit guard: an identical comment from the same name moments ago is returned, not repeated.
+    const duplicate = await prisma.event_comments.findFirst({
+      where: { eventId: input.eventId, parentId, name, message, createdAt: { gte: new Date(Date.now() - 60 * 1000) } },
+    });
+    if (duplicate) return { ok: true, comment: { ...toDTO(duplicate), replies: [] } };
+
     const created = await prisma.event_comments.create({
       data: { id: randomUUID(), eventId: input.eventId, parentId, name, message, isOrganizerReply: viewer.isOrganizer },
     });

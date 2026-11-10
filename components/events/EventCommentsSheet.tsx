@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AlertCircle, ArrowRight, BadgeCheck, CornerDownRight, Loader2, MessageCircle, RefreshCw, Send, Trash2, X } from "lucide-react";
 import { createEventComment, deleteEventComment, getEventComments, type CommentDTO, type CommentViewer } from "@/lib/actions/comments";
 import { cn } from "@/lib/utils";
+import { useSubmitLock } from "@/lib/use-submit-lock";
 
 const MAX = 1000;
 const NAME_KEY = "domni:comment-name";
@@ -109,7 +110,10 @@ export function EventCommentsSheet({ eventId, eventTitle, count, variant = "card
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
-  async function post() {
+  const lock = useSubmitLock();
+  const post = () => lock(postImpl);
+
+  async function postImpl() {
     const text = message.trim();
     if (!text || posting) return;
     if (!viewer?.name && !name.trim()) return setPostError("Add your name first.");

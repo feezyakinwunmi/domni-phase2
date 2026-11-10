@@ -27,6 +27,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
           include: { ticketTypes: { orderBy: { createdAt: "asc" } } },
         },
         registrationFields: { orderBy: { sortOrder: "asc" } },
+        partnerPackages: { orderBy: { sortOrder: "asc" } },
       },
     }),
     prisma.profile.findUnique({ where: { id: user.id }, select: { plan: true } }),

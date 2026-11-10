@@ -13,6 +13,7 @@ import { formatZodIssue } from "@/lib/errors";
 import { toDateTimeLocal } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import { uploadNomineeImage } from "@/lib/supabase/storage";
+import { useSubmitLock } from "@/lib/use-submit-lock";
 
 function emptyNominee(): NomineeDraft {
   return { id: crypto.randomUUID(), name: "", bio: "", imageFile: null, imagePreview: "" };
@@ -73,8 +74,13 @@ export function CampaignForm({ initialData }: CampaignFormProps) {
     };
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  const lock = useSubmitLock();
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    void lock(submitImpl);
+  }
+
+  async function submitImpl() {
     setError(null);
 
     // Validate before uploading photos so a typo doesn't cost uploads.

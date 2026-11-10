@@ -59,6 +59,8 @@ model Event {
   organizer          Profile             @relation("OrganizerEvents", fields: [organizerId], references: [id])
   ticketTemplate     TicketTemplate?     @relation(fields: [ticketTemplateId], references: [id], onUpdate: NoAction, map: "fk_ticket_template")
   registrationFields RegistrationField[]
+  partnerPackages    PartnerPackage[]
+  partnerApplications PartnerApplication[]
   votingCampaigns    VotingCampaign[]
 
   @@index([organizerId])
@@ -215,6 +217,7 @@ model Transaction {
   tickets    Ticket[]
   user       Profile?          @relation(fields: [userId], references: [id])
   votes      Vote[]
+  partnerApplications PartnerApplication[]
 
   @@index([userId])
   @@index([status])
@@ -288,6 +291,7 @@ enum TransactionType {
   VOTE_PURCHASE
   PAYOUT
   PLAN_UPGRADE
+  PARTNER_PAYMENT
 }
 
 enum TransactionStatus {
@@ -295,4 +299,68 @@ enum TransactionStatus {
   SUCCESSFUL
   FAILED
   REVERSED
+}
+
+/// Something an event sells to businesses: a sponsorship tier, an exhibition
+/// stand (per stand or per square metre), ad/logo placement, a vendor stall…
+model PartnerPackage {
+  id               String               @id @default(uuid()) @db.Uuid
+  eventId          String               @db.Uuid
+  /// SPONSORSHIP | EXHIBITION | ADVERTISING | VENDOR | OTHER
+  category         String               @default("SPONSORSHIP")
+  title            String
+  description      String?
+  benefits         String[]             @default([])
+  /// FIXED | PER_SQM | PER_UNIT | ON_REQUEST
+  pricingModel     String               @default("FIXED")
+  /// Price per package, per sqm or per unit depending on pricingModel.
+  priceKobo        Int                  @default(0)
+  unitLabel        String?
+  minUnits         Int                  @default(1)
+  maxUnits         Int?
+  /// Capacity in units (slots, or total sqm). Null = unlimited.
+  quantity         Int?
+  quantityTaken    Int                  @default(0)
+  requiresApproval Boolean              @default(true)
+  highlight        Boolean              @default(false)
+  logoOnTicket     Boolean              @default(false)
+  showOnEventPage  Boolean              @default(true)
+  sortOrder        Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  event            Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  applications     PartnerApplication[]
+
+  @@index([eventId])
+  @@map("partner_packages")
+}
+
+model PartnerApplication {
+  id            String         @id @default(uuid()) @db.Uuid
+  packageId     String         @db.Uuid
+  eventId       String         @db.Uuid
+  companyName   String
+  contactName   String
+  email         String
+  phone         String?
+  website       String?
+  logoUrl       String?
+  notes         String?
+  units         Int            @default(1)
+  amountKobo    Int            @default(0)
+  /// PENDING | APPROVED | AWAITING_PAYMENT | PAID | REJECTED | CANCELLED
+  status        String         @default("PENDING")
+  organizerNote String?
+  /// Units currently held against the package capacity.
+  reservedUnits Int            @default(0)
+  transactionId String?        @db.Uuid
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  package       PartnerPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  transaction   Transaction?   @relation(fields: [transactionId], references: [id])
+
+  @@index([eventId])
+  @@index([packageId])
+  @@map("partner_applications")
 }

@@ -12,6 +12,8 @@ export interface TicketRenderData {
   qr: string;
   ticketNumber?: string | null;
   photoUrl?: string | null;
+  /** Logos of confirmed partners whose package includes "logo on tickets". */
+  sponsorLogos?: string[];
   extraFields?: TicketExtraField[];
 }
 

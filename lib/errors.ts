@@ -75,6 +75,7 @@ export function formatZodIssue(issue: ZodIssue | undefined): string {
     if (key === "ticketTypes") crumbs.push(`Ticket ${next + 1}`);
     if (key === "registrationFields") crumbs.push(`Form field ${next + 1}`);
     if (key === "extras") crumbs.push(`Detail ${next + 1}`);
+    if (key === "partnerPackages") crumbs.push(`Partner package ${next + 1}`);
   }
 
   return crumbs.length ? `${crumbs.join(" › ")}: ${issue.message}` : issue.message;

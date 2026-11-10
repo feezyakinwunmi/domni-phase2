@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { eventDetailsSchema, FIELD_TYPES, isChoiceType } from "@/lib/event-details";
+import { partnerPackageSchema } from "@/lib/partners";
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #7c3aed");
 
@@ -78,6 +79,7 @@ export const createEventSchema = z
       .refine((v) => !v || !Number.isNaN(Date.parse(v)), "Invalid end date"),
     details: eventDetailsSchema.default({}),
     sections: z.array(eventSectionSchema).min(1, "Add at least one section"),
+    partnerPackages: z.array(partnerPackageSchema).max(30).default([]),
     registrationFields: z
       .array(registrationFieldSchema)
       .max(40)

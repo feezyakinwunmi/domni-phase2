@@ -99,19 +99,31 @@ export function TicketFooter({
   className?: string;
 }) {
   const showNumber = theme.show.number && data.ticketNumber;
-  if (!showNumber && !theme.footerNote) return null;
+  const sponsors = (data.sponsorLogos ?? []).slice(0, 6);
+  if (!showNumber && !theme.footerNote && sponsors.length === 0) return null;
 
   const muted = tone === "dark" ? "text-white/50" : "text-slate-400";
 
   return (
-    <div className={`relative flex items-end justify-between gap-3 ${className}`}>
-      {theme.footerNote ? (
-        <p className={`max-w-[70%] text-[10px] leading-snug ${muted}`}>{theme.footerNote}</p>
-      ) : (
-        <span />
+    <div className={`relative ${className}`}>
+      {sponsors.length > 0 && (
+        <div className="mb-3">
+          <p className={`mb-1.5 text-[9px] font-semibold uppercase tracking-[0.2em] ${muted}`}>Supported by</p>
+          {/* White chips keep any logo legible on dark designs. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {sponsors.map((src) => (
+              <span key={src} className="flex h-7 items-center rounded-md bg-white px-1.5 shadow-sm">
+                <img src={src} alt="" crossOrigin="anonymous" className="max-h-5 max-w-[64px] object-contain" />
+              </span>
+            ))}
+          </div>
+        </div>
       )}
-      {showNumber && (
-        <p className={`font-mono text-[10px] font-semibold tracking-[0.15em] ${muted}`}>{data.ticketNumber}</p>
+      {(showNumber || theme.footerNote) && (
+        <div className="flex items-end justify-between gap-3">
+          {theme.footerNote ? <p className={`max-w-[70%] text-[10px] leading-snug ${muted}`}>{theme.footerNote}</p> : <span />}
+          {showNumber && <p className={`font-mono text-[10px] font-semibold tracking-[0.15em] ${muted}`}>{data.ticketNumber}</p>}
+        </div>
       )}
     </div>
   );

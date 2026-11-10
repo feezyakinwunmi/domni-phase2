@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { initializeVotePayment, verifyVotePurchase } from "@/lib/actions/voting";
 import { formatNaira } from "@/lib/format";
+import { useSubmitLock } from "@/lib/use-submit-lock";
 
 interface VoteModalProps {
   nomineeId: string;
@@ -45,7 +46,10 @@ export function VoteModal({ nomineeId, nomineeName, pricePerVoteKobo, disabled }
     }
   }
 
-  async function handleVote() {
+  const lock = useSubmitLock();
+  const handleVote = () => lock(handleVoteImpl);
+
+  async function handleVoteImpl() {
     setError(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError("Enter a valid email address.");
 

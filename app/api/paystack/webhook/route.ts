@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyTicketPurchase } from "@/lib/actions/tickets";
 import { verifyProUpgrade } from "@/lib/actions/plan";
 import { verifyVotePurchase } from "@/lib/actions/voting";
+import { verifyPartnerPayment } from "@/lib/actions/partners";
 
 export async function POST(req: Request) {
   const secret = process.env.PAYSTACK_SECRET_KEY;
@@ -35,6 +36,9 @@ export async function POST(req: Request) {
       } else if (transaction?.type === "VOTE_PURCHASE") {
         const result = await verifyVotePurchase(reference);
         if (!result.success) console.error("[domni] webhook vote verify failed", reference, result.error);
+      } else if (transaction?.type === "PARTNER_PAYMENT") {
+        const result = await verifyPartnerPayment(reference);
+        if (!result.success) console.error("[domni] webhook partner verify failed", reference, result.error);
       }
     }
 

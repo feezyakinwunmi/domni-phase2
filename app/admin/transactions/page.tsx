@@ -7,7 +7,7 @@ import { ActionButton } from "@/components/admin/ActionButton";
 import { Badge, Card, FilterBar, PageHeader, Pagination, StatTile, STATUS_TONE, Table, Td } from "@/components/ui/panel";
 
 type SP = { q?: string; type?: string; status?: string; flag?: string; page?: string };
-const TYPES: TransactionType[] = ["TICKET_PURCHASE", "VOTE_PURCHASE", "PLAN_UPGRADE", "PAYOUT"];
+const TYPES: TransactionType[] = ["TICKET_PURCHASE", "VOTE_PURCHASE", "PARTNER_PAYMENT", "PLAN_UPGRADE", "PAYOUT"];
 const STATUSES: TransactionStatus[] = ["SUCCESSFUL", "PENDING", "FAILED", "REVERSED"];
 
 type Meta = {
@@ -68,7 +68,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
           {rows.map((t) => {
             const m = (t.metadata ?? {}) as Meta;
             const buyer = t.user?.email ?? m.email ?? m.voterEmail ?? "—";
-            const isSale = t.type === "TICKET_PURCHASE" || t.type === "VOTE_PURCHASE";
+            const isSale = t.type === "TICKET_PURCHASE" || t.type === "VOTE_PURCHASE" || t.type === "PARTNER_PAYMENT";
             return (
               <tr key={t.id}>
                 <Td className="font-mono text-xs">{t.reference}</Td>

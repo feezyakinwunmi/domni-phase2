@@ -2,7 +2,8 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 
-const BUCKET = "attendee-photos";
+// ?kind=logo stores partner/sponsor logos separately from attendee photos.
+const BUCKETS = { photo: "attendee-photos", logo: "partner-logos" } as const;
 const MAX_BYTES = 4 * 1024 * 1024;
 
 // Best-effort per-IP limit (per server instance) so the endpoint can't be used as free file hosting.
@@ -49,6 +50,7 @@ export async function POST(req: Request) {
     const kind = detectImage(bytes);
     if (!kind) return NextResponse.json({ error: "Please upload a JPG, PNG or WebP image." }, { status: 415 });
 
+    const BUCKET = BUCKETS[new URL(req.url).searchParams.get("kind") === "logo" ? "logo" : "photo"];
     const supabase = createAdminClient();
     const path = `${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${kind.ext}`;
     const upload = () => supabase.storage.from(BUCKET).upload(path, bytes, { contentType: kind.type, cacheControl: "31536000" });

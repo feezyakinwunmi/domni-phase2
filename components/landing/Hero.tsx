@@ -18,10 +18,8 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
         >
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-violet-300">
-            <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-pulse" />
-            Built for campus organizers
-          </span>
+          
+         
 
           <h1 className="mt-6 font-display text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
             Powering Campus Experiences

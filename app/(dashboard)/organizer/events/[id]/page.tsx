@@ -22,6 +22,8 @@ import { parseEventDetails } from "@/lib/event-details";
 import { Button } from "@/components/ui/button";
 import { PublishButton } from "@/components/events/publish-button";
 import { DeleteButton } from "@/components/events/delete-button";
+import { PartnerApplicationsManager } from "@/components/partners/PartnerApplicationsManager";
+import { hasUnits, unitNoun } from "@/lib/partners";
 
 interface EventPageProps {
   params: Promise<{ id: string }>;
@@ -72,6 +74,8 @@ export default async function OrganizerEventPage({ params, searchParams }: Event
         include: { ticketTypes: { orderBy: { createdAt: "asc" } } },
       },
       registrationFields: { orderBy: { sortOrder: "asc" } },
+      partnerPackages: { orderBy: { sortOrder: "asc" } },
+      partnerApplications: { orderBy: { createdAt: "desc" }, include: { package: true } },
     },
   });
 
@@ -94,6 +98,26 @@ export default async function OrganizerEventPage({ params, searchParams }: Event
   const totalSold = ticketTypes.reduce((n, t) => n + t.quantitySold, 0);
   const totalRevenue = ticketTypes.reduce((n, t) => n + t.priceKobo * t.quantitySold, 0);
   const shownFields = event.registrationFields.filter((f) => f.type !== "photo").slice(0, 3);
+  const partnerApps = event.partnerApplications.map((a) => ({
+    id: a.id,
+    companyName: a.companyName,
+    contactName: a.contactName,
+    email: a.email,
+    phone: a.phone,
+    website: a.website,
+    logoUrl: a.logoUrl,
+    notes: a.notes,
+    units: a.units,
+    unitText: hasUnits(a.package) ? `${a.units} ${unitNoun(a.package, a.units)}` : null,
+    amountKobo: a.amountKobo,
+    status: a.status,
+    organizerNote: a.organizerNote,
+    createdAt: a.createdAt.toISOString(),
+    packageTitle: a.package.title,
+    onRequest: a.package.pricingModel === "ON_REQUEST",
+  }));
+  const partnerRevenue = event.partnerApplications.filter((a) => a.status === "PAID").reduce((n, a) => n + a.amountKobo, 0);
+  const partnerPending = event.partnerApplications.filter((a) => a.status === "PENDING").length;
 
   return (
     <main className="min-h-screen bg-slate-50 py-6">
@@ -254,6 +278,39 @@ export default async function OrganizerEventPage({ params, searchParams }: Event
               </div>
             ))}
           </div>
+
+          {event.partnerPackages.length > 0 && (
+            <div className="mt-12">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900">Partners & exhibitors</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {event.partnerApplications.length === 0
+                      ? "No applications yet. Share your event link with #partner at the end to send businesses straight to your packages."
+                      : `${formatNaira(partnerRevenue).replace("Free", "₦0")} confirmed · ${partnerPending} awaiting your review`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {event.partnerPackages.map((p) => (
+                  <div key={p.id} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <p className="font-medium text-slate-900">{p.title}</p>
+                    <p className="text-xs text-slate-500">
+                      {p.quantityTaken}
+                      {p.quantity != null ? ` / ${p.quantity}` : ""} {hasUnits(p) ? unitNoun(p) : "booked"} taken
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {partnerApps.length > 0 && (
+                <div className="mt-4">
+                  <PartnerApplicationsManager applications={partnerApps} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Registrations */}
           <div className="mt-12">

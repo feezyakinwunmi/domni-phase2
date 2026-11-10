@@ -7,6 +7,7 @@ import { initializeTicketPurchase, verifyTicketPurchase } from "@/lib/actions/ti
 import { RegistrationFields } from "@/components/forms/RegistrationFields";
 import { validateRegistration, type RegistrationFieldDef } from "@/lib/event-details";
 import { formatNaira } from "@/lib/format";
+import { useSubmitLock } from "@/lib/use-submit-lock";
 
 interface TicketModalProps {
   ticketTypeId: string;
@@ -62,7 +63,10 @@ export function TicketModal({
     if (fieldErrors[key]) setFieldErrors(({ [key]: _, ...rest }) => rest);
   }
 
-  async function handleContinue() {
+  const lock = useSubmitLock();
+  const handleContinue = () => lock(handleContinueImpl);
+
+  async function handleContinueImpl() {
     setError(null);
 
     const errors = validateRegistration(registrationFields, { name, email, answers }, { nameLabel, emailLabel });

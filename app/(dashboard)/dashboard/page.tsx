@@ -29,9 +29,10 @@ export default async function DashboardOverviewPage() {
       SELECT to_char((t."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Africa/Lagos', 'YYYY-MM-DD') AS day,
              SUM(t."amountKobo")::bigint AS value
       FROM "transactions" t
-      JOIN "ticket_types" tt ON tt.id::text = t.metadata->>'ticketTypeId'
-      JOIN "event_sections" s ON s.id = tt."sectionId"
-      JOIN "events" e ON e.id = s."eventId"
+      LEFT JOIN "ticket_types" tt ON t.type = 'TICKET_PURCHASE' AND tt.id::text = t.metadata->>'ticketTypeId'
+      LEFT JOIN "event_sections" s ON s.id = tt."sectionId"
+      LEFT JOIN "partner_applications" pa ON t.type = 'PARTNER_PAYMENT' AND pa.id::text = t.metadata->>'applicationId'
+      JOIN "events" e ON e.id = COALESCE(s."eventId", pa."eventId")
       WHERE e."organizerId" = ${user.id}::uuid AND t.status = 'SUCCESSFUL' AND t."amountKobo" > 0
         AND t."createdAt" >= ${since30}
       GROUP BY 1`,
@@ -106,7 +107,7 @@ export default async function DashboardOverviewPage() {
         <StatTile label="Voting campaigns" value={campaignCount} />
       </div>
 
-      <Card title="Paid sales per day">
+      <Card title="Paid sales per day (tickets & partners)">
         <ColumnChart data={sales} kind="naira" label="Sales" />
       </Card>
 

@@ -37,6 +37,15 @@ export default async function AdminPayoutsPage() {
         JOIN "nominees" n ON n.id::text = t.metadata->>'nomineeId'
         JOIN "voting_campaigns" c ON c.id = n."campaignId"
         WHERE t.type = 'VOTE_PURCHASE' AND t.status = 'SUCCESSFUL' AND t."amountKobo" > 0
+        UNION ALL
+        SELECT e."organizerId", t."amountKobo",
+               COALESCE((t.metadata->'saleFees'->>'domniFeeKobo')::bigint, 0),
+               COALESCE((t.metadata->'saleFees'->>'estimatedOrganizerNetKobo')::bigint, t."amountKobo"),
+               COALESCE(t.metadata->>'payoutMode', 'manual')
+        FROM "transactions" t
+        JOIN "partner_applications" pa ON pa.id::text = t.metadata->>'applicationId'
+        JOIN "events" e ON e.id = pa."eventId"
+        WHERE t.type = 'PARTNER_PAYMENT' AND t.status = 'SUCCESSFUL' AND t."amountKobo" > 0
       )
       SELECT org,
              SUM(amount)::bigint AS gross,

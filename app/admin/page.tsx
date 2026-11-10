@@ -45,7 +45,7 @@ export default async function AdminOverviewPage() {
              SUM(COALESCE((metadata->'saleFees'->>'domniFeeKobo')::bigint, 0))::bigint AS fees,
              COUNT(*)::bigint AS count
       FROM "transactions"
-      WHERE status = 'SUCCESSFUL' AND type IN ('TICKET_PURCHASE', 'VOTE_PURCHASE') AND "amountKobo" > 0`,
+      WHERE status = 'SUCCESSFUL' AND type IN ('TICKET_PURCHASE', 'VOTE_PURCHASE', 'PARTNER_PAYMENT') AND "amountKobo" > 0`,
     prisma.$queryRaw<Totals[]>`
       SELECT SUM("amountKobo")::bigint AS gross, 0::bigint AS fees, COUNT(*)::bigint AS count
       FROM "transactions" WHERE status = 'SUCCESSFUL' AND type = 'PLAN_UPGRADE'`,
@@ -100,8 +100,8 @@ export default async function AdminOverviewPage() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Sales volume (tickets + votes)" value={compactNaira(Number(sales?.gross ?? 0))} hint={`${Number(sales?.count ?? 0).toLocaleString()} paid orders`} />
-        <StatTile label="DOMNI fees earned" value={compactNaira(Number(sales?.fees ?? 0))} hint="From ticket & vote sales" />
+        <StatTile label="Sales volume (tickets, votes, partners)" value={compactNaira(Number(sales?.gross ?? 0))} hint={`${Number(sales?.count ?? 0).toLocaleString()} paid orders`} />
+        <StatTile label="DOMNI fees earned" value={compactNaira(Number(sales?.fees ?? 0))} hint="From tickets, votes & partner packages" />
         <StatTile label="Pro revenue" value={compactNaira(Number(pro?.gross ?? 0))} hint={`${proUsers} active Pro account(s)`} />
         <StatTile label="Users" value={users.toLocaleString()} hint={`${organizers} organizers · +${newUsers30} in 30 days`} />
         <StatTile label="Events" value={events.toLocaleString()} hint={`${publishedEvents} published`} />

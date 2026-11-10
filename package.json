@@ -12,7 +12,8 @@
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
     "db:sync": "prisma db push && prisma generate && node scripts/seed-templates.js",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "seed:demo": "node scripts/seed-demo-event.js"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",

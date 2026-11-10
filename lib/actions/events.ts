@@ -10,6 +10,7 @@ import { formatZodIssue, toUserMessage, type ActionResult } from "@/lib/errors";
 // Generous limits: the Supabase pooler adds a round trip per statement and an
 // event with many sections/fields can take a few seconds to write.
 const TX_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
+const DUPLICATE_WINDOW_MS = 2 * 60 * 1000;
 
 function slugify(title: string) {
   const base = title
@@ -76,6 +77,28 @@ function ticketTypeData(tt: CreateEventInput["sections"][number]["ticketTypes"][
   };
 }
 
+function packageData(p: CreateEventInput["partnerPackages"][number], index: number) {
+  const perUnit = p.pricingModel === "PER_SQM" || p.pricingModel === "PER_UNIT";
+  return {
+    category: p.category,
+    title: p.title,
+    description: p.description || null,
+    benefits: p.benefits,
+    pricingModel: p.pricingModel,
+    priceKobo: p.pricingModel === "ON_REQUEST" ? 0 : Math.round(p.price * 100),
+    unitLabel: perUnit ? p.unitLabel || null : null,
+    minUnits: perUnit ? p.minUnits : 1,
+    maxUnits: perUnit ? p.maxUnits ?? null : null,
+    quantity: p.quantity ?? null,
+    // Quotes need a human: price-on-request packages always go through review.
+    requiresApproval: p.pricingModel === "ON_REQUEST" ? true : p.requiresApproval,
+    highlight: p.highlight,
+    logoOnTicket: p.logoOnTicket,
+    showOnEventPage: p.showOnEventPage,
+    sortOrder: index,
+  };
+}
+
 function fieldData(field: CreateEventInput["registrationFields"][number], index: number) {
   return {
     label: field.label,
@@ -110,6 +133,19 @@ export async function createEvent(payload: unknown): Promise<ActionResult<{ even
     if (!checked.ok) return checked;
     const data = checked.data;
 
+    // Double-submit guard: the same organizer creating the same event (title +
+    // start time) moments ago gets that event back instead of a duplicate.
+    const recent = await prisma.event.findFirst({
+      where: {
+        organizerId: user.id,
+        title: data.title,
+        startsAt: new Date(data.startsAt),
+        createdAt: { gte: new Date(Date.now() - DUPLICATE_WINDOW_MS) },
+      },
+      select: { id: true },
+    });
+    if (recent) return { ok: true, eventId: recent.id };
+
     // A single nested create is one atomic statement batch — no partial events.
     const event = await prisma.event.create({
       data: {
@@ -118,6 +154,7 @@ export async function createEvent(payload: unknown): Promise<ActionResult<{ even
         slug: slugify(data.title),
         status: "DRAFT",
         registrationFields: { create: data.registrationFields.map(fieldData) },
+        partnerPackages: { create: data.partnerPackages.map(packageData) },
         sections: {
           create: data.sections.map((section, sectionIndex) => ({
             title: section.title,
@@ -144,13 +181,21 @@ export async function updateEvent(eventId: string, payload: unknown): Promise<Ac
 
     const checked = await parseAndAuthorize(payload, auth.user.id);
     if (!checked.ok) return checked;
-    const { sections, registrationFields } = checked.data;
+    const { sections, registrationFields, partnerPackages } = checked.data;
 
     const existing = await prisma.event.findUniqueOrThrow({
       where: { id: eventId },
       select: {
         sections: { select: { id: true, ticketTypes: { select: { id: true, title: true, quantitySold: true } } } },
         registrationFields: { select: { id: true } },
+        partnerPackages: {
+          select: {
+            id: true,
+            title: true,
+            quantityTaken: true,
+            _count: { select: { applications: { where: { status: { in: ["PENDING", "APPROVED", "AWAITING_PAYMENT", "PAID"] } } } } },
+          },
+        },
       },
     });
 
@@ -184,6 +229,20 @@ export async function updateEvent(eventId: string, payload: unknown): Promise<Ac
       }
     }
 
+    const existingPackages = new Map(existing.partnerPackages.map((p) => [p.id, p]));
+    const keepPackageIds = new Set(partnerPackages.map((p) => p.id).filter((id): id is string => !!id && existingPackages.has(id)));
+    for (const p of existing.partnerPackages) {
+      if (!keepPackageIds.has(p.id) && p._count.applications > 0) {
+        return { ok: false, error: `"${p.title}" has partner applications, so it can't be removed. Set its availability to what's already booked instead.` };
+      }
+    }
+    for (const p of partnerPackages) {
+      const prev = p.id ? existingPackages.get(p.id) : undefined;
+      if (prev && p.quantity != null && p.quantity < prev.quantityTaken) {
+        return { ok: false, error: `"${p.title}" already has ${prev.quantityTaken} booked — availability can't be lower than that.` };
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.event.update({ where: { id: eventId }, data: eventData(checked.data) });
 
@@ -203,6 +262,13 @@ export async function updateEvent(eventId: string, payload: unknown): Promise<Ac
       const removedTicketTypeIds = [...existingTicketTypes.keys()].filter((id) => !incomingTicketTypeIds.has(id));
       if (removedTicketTypeIds.length) {
         await tx.ticketType.deleteMany({ where: { id: { in: removedTicketTypeIds } } });
+      }
+
+      // --- partner packages
+      await tx.partnerPackage.deleteMany({ where: { eventId, id: { notIn: [...keepPackageIds] } } });
+      for (const [index, p] of partnerPackages.entries()) {
+        if (p.id && keepPackageIds.has(p.id)) await tx.partnerPackage.update({ where: { id: p.id }, data: packageData(p, index) });
+        else await tx.partnerPackage.create({ data: { ...packageData(p, index), eventId } });
       }
 
       // --- sections
@@ -253,10 +319,13 @@ export async function setEventStatus(
     if (!auth.ok) return auth;
 
     if (status === "PUBLISHED") {
-      const ticketTypes = await prisma.ticketType.findMany({ where: { section: { eventId } }, select: { priceKobo: true } });
+      const [ticketTypes, sellsPartnerPackages] = await Promise.all([
+        prisma.ticketType.findMany({ where: { section: { eventId } }, select: { priceKobo: true } }),
+        prisma.partnerPackage.count({ where: { eventId, OR: [{ priceKobo: { gt: 0 } }, { pricingModel: "ON_REQUEST" }] } }),
+      ]);
       if (ticketTypes.length === 0) return { ok: false, error: "Add at least one ticket type before publishing." };
 
-      if (ticketTypes.some((t) => t.priceKobo > 0)) {
+      if (ticketTypes.some((t) => t.priceKobo > 0) || sellsPartnerPackages > 0) {
         const organizer = await prisma.profile.findUnique({
           where: { id: auth.user.id },
           select: { paystackSubaccountCode: true },
@@ -264,7 +333,7 @@ export async function setEventStatus(
         if (!organizer?.paystackSubaccountCode) {
           return {
             ok: false,
-            error: "Add your payout bank account in Settings → Payout account before publishing paid tickets, so sales can be paid to you.",
+            error: "Add your payout bank account in Settings → Payout account before publishing paid tickets or partner packages, so sales can be paid to you.",
           };
         }
       }
@@ -292,6 +361,14 @@ export async function deleteEvent(eventId: string): Promise<ActionResult> {
       return {
         ok: false,
         error: `This event has ${soldTickets} ticket(s) issued, so it can't be deleted. Cancel or unpublish it instead.`,
+      };
+    }
+
+    const activePartners = await prisma.partnerApplication.count({ where: { eventId, status: { in: ["APPROVED", "PAID"] } } });
+    if (activePartners > 0) {
+      return {
+        ok: false,
+        error: `This event has ${activePartners} approved or paid partner booking(s), so it can't be deleted. Cancel those bookings or unpublish the event instead.`,
       };
     }
 

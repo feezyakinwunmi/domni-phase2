@@ -159,6 +159,13 @@ async function outstandingManualPayout(organizerId: string) {
       JOIN "voting_campaigns" c ON c.id = n."campaignId"
       WHERE c."organizerId" = ${organizerId}::uuid AND t.type = 'VOTE_PURCHASE' AND t.status = 'SUCCESSFUL'
         AND t."amountKobo" > 0 AND COALESCE(t.metadata->>'payoutMode', 'manual') <> 'subaccount'
+      UNION ALL
+      SELECT COALESCE((t.metadata->'saleFees'->>'estimatedOrganizerNetKobo')::bigint, t."amountKobo")
+      FROM "transactions" t
+      JOIN "partner_applications" pa ON pa.id::text = t.metadata->>'applicationId'
+      JOIN "events" e ON e.id = pa."eventId"
+      WHERE e."organizerId" = ${organizerId}::uuid AND t.type = 'PARTNER_PAYMENT' AND t.status = 'SUCCESSFUL'
+        AND t."amountKobo" > 0 AND COALESCE(t.metadata->>'payoutMode', 'manual') <> 'subaccount'
     )
     SELECT (COALESCE((SELECT SUM(net) FROM sales), 0)
           - COALESCE((SELECT SUM("amountKobo") FROM "transactions"
